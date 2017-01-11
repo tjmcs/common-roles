@@ -1,0 +1,4 @@
+- name: Ensure network interfaces are up
+  command: "ifup {{item}}"
+  when: not (item == "lo")
+  with_items:  "{{ansible_interfaces}}"

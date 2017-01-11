@@ -1,0 +1,5 @@
+---
+- name: Determine JAVA_HOME location
+  shell: 'dirname "$(dirname "$(readlink -f "$(which javac)")")"'
+  register: command_output
+- set_fact: java_home='{{command_output.stdout}}'
