@@ -1,7 +1,8 @@
+# (c) 2017 DataNexus Inc.  All Rights Reserved. 
 ---
-- name: Install packages
-  yum:
-    name: "{{item}}"
+- name: "Installing {{ package_list }}"
+  package:
+    name: "{{ item }}"
     state: present
-  environment: "{{proxy_env}}"
+  environment: "{{ proxy_env | default({}) }}"
   with_items: "{{ package_list | default([]) }}"
