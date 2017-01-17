@@ -1,4 +1,2 @@
-- name: Ensure network interfaces are up
-  command: "ifup {{item}}"
-  when: not (item == "lo")
-  with_items:  "{{ansible_interfaces}}"
+- name: Restart network to ensure interfaces are up
+  service: name=network state=restarted
