@@ -22,11 +22,13 @@
 - name: Set environment variables
   set_fact:
     environment_vars:  "{{ no_proxy_vars|default({}) | combine(proxy_vars|default({})) }}"
-- name: Unpack IAG certificates
+- name: Unpack certificates
+  become: true
   unarchive:
     src: "{{proxy_certs_file}}"
     dest: /etc/pki/ca-trust/source/anchors
   when: not (http_proxy is undefined or http_proxy is none or http_proxy | trim == '')
 - name: Add certificates to list of trusted certs
+  become: true
   shell: update-ca-trust
   when: not (http_proxy is undefined or http_proxy is none or http_proxy | trim == '')
