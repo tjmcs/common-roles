@@ -1,3 +1,4 @@
+# (c) 2016 DataNexus Inc.  All Rights Reserved
 ---
 - name: Get IP address of {{iface_name}}
   shell: "/usr/sbin/ip addr list {{iface_name}} | grep -w 'inet' | cut -d' ' -f6 | cut -d'/' -f1"
