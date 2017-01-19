@@ -1,6 +1,32 @@
-# (c) 2016 DataNexus Inc.  All Rights Reserved
 # (c) 2017 DataNexus Inc.  All Rights Reserved. 
 ---
+- set_fact: yum_http_proxy="{{proxy_env.http_proxy|default('')}}"
+  when: proxy_env is defined
+- set_fact: yum_proxy_username="{{proxy_env.proxy_username|default('')}}"
+  when: proxy_env is defined
+- set_fact: yum_proxy_password="{{proxy_env.proxy_password|default('')}}"
+  when: proxy_env is defined
+- name: add http_proxy to yum.conf if defined
+  become: true
+  lineinfile:
+    dest: /etc/yum.conf 
+    line:  "proxy={{yum_http_proxy}}"
+    state: present
+  when: not (yum_http_proxy is undefined or yum_http_proxy is none or yum_http_proxy | trim == '')
+- name: add proxy_username to yum.conf if defined
+  become: true
+  lineinfile:
+    dest: /etc/yum.conf 
+    line:  "proxy_username={{yum_proxy_username}}"
+    state: present
+  when: not (yum_proxy_username is undefined or yum_proxy_username is none or yum_proxy_username | trim == '')
+- name: add proxy_password to yum.conf if defined
+  become: true
+  lineinfile:
+    dest: /etc/yum.conf 
+    line:  "proxy_password={{yum_proxy_password}}"
+    state: present
+  when: not (yum_proxy_password is undefined or yum_proxy_password is none or yum_proxy_password | trim == '')
 - name: "Installing {{ package_list }}"
   become: true
   package:
