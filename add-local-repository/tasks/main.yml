@@ -19,7 +19,7 @@
 - name: Download keys for InfluxData and Confluent repositories
   become: true
   get_url:
-    url: "http://{{yum_repo_addr}}/repo/extern/gpg-keys/{{item}}"
+    url: "http://{{yum_repository}}/repo/extern/gpg-keys/{{item}}"
     dest: "/etc/pki/rpm-gpg/{{item}}"
   with_items:
     - confluent.key
