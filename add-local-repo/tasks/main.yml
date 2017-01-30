@@ -1,0 +1,44 @@
+---
+- name: "Disable existing base, updates, and extras repositories"
+  become: true
+  ini_file:
+    dest: "/etc/yum.repos.d/CentOS-Base.repo"
+    section: "{{item}}"
+    option: enabled
+    value: 0
+  with_items:
+    - base
+    - updates
+    - extras
+- name: "Add local yum repository file"
+  become: true
+  template:
+    src: local-repo-template.j2
+    dest: "/etc/yum.repos.d/local.repo"
+    mode: 0644
+- name: Download keys for InfluxData and Confluent repositories
+  become: true
+  get_url:
+    url: "http://{{yum_repo_addr}}/repo/extern/gpg-keys/{{item}}"
+    dest: "/etc/pki/rpm-gpg/{{item}}"
+  with_items:
+    - confluent.key
+    - influxdb.key
+- name: Add keys to list of trusted keys for RPM installs
+  become: true
+  command: "rpm --import /etc/pki/rpm-gpg/{{item}}"
+  args:
+    warn: no
+  with_items:
+    - confluent.key
+    - influxdb.key
+- name: "remove all repository entries from the current yum cache"
+  become: true
+  command: yum clean all
+  args:
+    warn: no
+- name: "list all configured yum repositories"
+  become: true
+  command: yum repolist all
+  args:
+    warn: no
