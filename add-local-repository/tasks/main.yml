@@ -1,44 +1,55 @@
 ---
-- name: "Disable existing base, updates, and extras repositories"
+- name: stat CentOS-Base.repo
+  stat: path="/etc/yum.repos.d/CentOS-Base.repo"
+  register: CentOS_Base_stat
+  when: local_repository_url is defined
+- name: Copy CentOS-Base.repo to CentOS-Base.repo-
   become: true
-  ini_file:
-    dest: "/etc/yum.repos.d/CentOS-Base.repo"
-    section: "{{item}}"
-    option: enabled
-    value: 0
-  with_items:
-    - base
-    - updates
-    - extras
-- name: "Add local yum repository file"
+  copy:
+    remote_src: true
+    src: "/etc/yum.repos.d/CentOS-Base.repo"
+    dest: "/etc/yum.repos.d/CentOS-Base.repo-"
+  when: CentOS_Base_stat.stat.exists and local_repository_url is defined
+- name: Remove original CentOS-Base.repo file
   become: true
-  template:
-    src: local-repo-template.j2
-    dest: "/etc/yum.repos.d/local.repo"
-    mode: 0644
-- name: Download keys for InfluxData and Confluent repositories
+  file:
+    path: /etc/yum.repos.d/CentOS-Base.repo
+    state: absent
+  when: CentOS_Base_stat.stat.exists and local_repository_url is defined
+- name: "Add local yum repository file (if one was defined)"
   become: true
   get_url:
-    url: "http://{{yum_repository}}/repo/extern/gpg-keys/{{item}}"
-    dest: "/etc/pki/rpm-gpg/{{item}}"
-  with_items:
-    - confluent.key
-    - influxdb.key
+    url: "{{local_repository_url}}"
+    dest: "/etc/yum.repos.d/{{local_repository_url.split('/')[-1]}}"
+    mode: 0644
+  when: local_repository_url is defined
+- name: "Get list of extra keys to download"
+  uri: url="{{local_repository_extra_keys}}" return_content=yes
+  register: key_map
+  when: local_repository_url is defined
+- name: Download extra keys via URLs embedded in the key map
+  become: true
+  get_url:
+    url: "{{item.value}}"
+    dest: "/etc/pki/rpm-gpg/{{item.value.split('/')[-1]}}"
+  with_dict: "{{key_map.content}}"
+  when: local_repository_url is defined
 - name: Add keys to list of trusted keys for RPM installs
   become: true
-  command: "rpm --import /etc/pki/rpm-gpg/{{item}}"
+  command: "rpm --import /etc/pki/rpm-gpg/{{item.value.split('/')[-1]}}"
   args:
     warn: no
-  with_items:
-    - confluent.key
-    - influxdb.key
+  with_dict: "{{key_map.content}}"
+  when: local_repository_url is defined
 - name: "remove all repository entries from the current yum cache"
   become: true
   command: yum clean all
   args:
     warn: no
+  when: local_repository_url is defined
 - name: "list all configured yum repositories"
   become: true
   command: yum repolist all
   args:
     warn: no
+  when: local_repository_url is defined
