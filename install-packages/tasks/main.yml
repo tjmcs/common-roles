@@ -3,7 +3,6 @@
 - name: "Installing {{ package_list }}"
   become: true
   package:
-    name: "{{ item }}"
+    name: "{{ (package_list | default([])) | join(',') }}"
     state: present
   environment: "{{ proxy_env | default({}) }}"
-  with_items: "{{ package_list | default([]) }}"
