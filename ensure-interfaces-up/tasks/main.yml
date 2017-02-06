@@ -1,4 +1,5 @@
 # (c) 2016 DataNexus Inc.  All Rights Reserved
+---
 - name: Restart network to ensure interfaces are up
   become: true
   service: name=network state=restarted
