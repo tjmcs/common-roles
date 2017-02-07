@@ -50,7 +50,7 @@
   - name: Point CentOS repositories in CentOS-Base.repo file to mirror
     replace:
       dest: "/etc/yum.repos.d/CentOS-Base.repo"
-      regexp: '^#(baseurl=http://)(mirror.centos.org)\/centos(.*)$'
+      regexp: '^#?(baseurl=http://)([^\/]+)\/.*(/\$releasever/.*)$'
       replace: '\g<1>{{yum_repository}}/repo/CentOS\g<3>'
   - name: Comment out mirrorlist entries
     replace:
@@ -67,7 +67,7 @@
   - name: Switch CentOS repositories in CentOS-Base.repo file back to standard mirrors
     replace:
       dest: "/etc/yum.repos.d/CentOS-Base.repo"
-      regexp: '^(baseurl=http://)([^\/]+)/repo/CentOS(.*)$'
+      regexp: '^(baseurl=http://)([^\/]+)\/.*(/\$releasever/.*)$'
       replace: '#\g<1>mirror.centos.org/centos\g<3>'
   - name: Uncomment mirrorlist entries
     replace:
