@@ -82,7 +82,7 @@
 - block:
   - name: remove local repository file (if it exists)
     file:
-      path: "/etc/yum.repos.d/{{local_repository_url.split('/')[-1]}}"
+      path: "/etc/yum.repos.d/{{local_repository_url | basename}}"
       state: absent
   become: true
   when: local_repository_url is defined and local_repo_response.status != 200
