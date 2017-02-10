@@ -35,7 +35,7 @@
     failed_when: false
   # then add the keys that were downloaded to the list of trusted keys for RPM installs
   - name: If we retrieved a key map, then add those keys to list of trusted keys for RPM installs
-    command: "rpm --import /etc/pki/rpm-gpg/{{item.value.split('/')[-1]}}"
+    command: "rpm --import /etc/pki/rpm-gpg/{{item.value | basename}}"
     args:
       warn: no
     with_dict: "{{local_repository_keys | default({})}}"
