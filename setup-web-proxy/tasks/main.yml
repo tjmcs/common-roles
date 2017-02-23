@@ -41,6 +41,7 @@
   become: true
   lineinfile:
     dest: /etc/yum.conf
+    regexp: "^proxy="
     line:  "proxy={{http_proxy}}"
     state: present
   when: not (http_proxy is undefined or http_proxy is none or http_proxy | trim == '')
@@ -50,11 +51,12 @@
     dest: /etc/yum.conf
     regexp:  "^proxy="
     state: absent
-  when: http_proxy is undefined or http_proxy is none or http_proxy | trim == ''
+  when: reset_proxy_settings and (http_proxy is undefined or http_proxy is none or http_proxy | trim == '')
 - name: add proxy_username to yum.conf if defined
   become: true
   lineinfile:
     dest: /etc/yum.conf
+    regexp: "^proxy_username="
     line:  "proxy_username={{proxy_username}}"
     state: present
   when: not (proxy_username is undefined or proxy_username is none or proxy_username | trim == '')
@@ -64,11 +66,12 @@
     dest: /etc/yum.conf
     regexp:  "^proxy_username="
     state: absent
-  when: proxy_username is undefined or proxy_username is none or proxy_username | trim == ''
+  when: reset_proxy_settings and (proxy_username is undefined or proxy_username is none or proxy_username | trim == '')
 - name: add proxy_password to yum.conf if defined
   become: true
   lineinfile:
     dest: /etc/yum.conf
+    regexp: "^proxy_password="
     line:  "proxy_password={{proxy_password}}"
     state: present
   when: not (proxy_password is undefined or proxy_password is none or proxy_password | trim == '')
@@ -78,7 +81,7 @@
     dest: /etc/yum.conf
     regexp:  "^proxy_password="
     state: absent
-  when: proxy_password is undefined or proxy_password is none or proxy_password | trim == ''
+  when: reset_proxy_settings and (proxy_password is undefined or proxy_password is none or proxy_password | trim == '')
 - name: Unpack certificates
   become: true
   unarchive:
