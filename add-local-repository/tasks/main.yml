@@ -13,14 +13,14 @@
     register: local_repo_response
     failed_when: false
   become: true
-  when: not(yum_repo_addr is undefined or yum_repo_addr is none or yum_repo_addr | trim == '') and local_repository_url is defined
+  when: not(yum_repository is undefined or yum_repository is none or yum_repository | trim == '') and local_repository_url is defined
 # and do the same for the list of extra keys (if a URL was defined for that)
 - block:
   - name: "Get list of extra keys to download"
     uri: url="{{local_repository_extra_keys}}" return_content=yes
     register: key_map
     failed_when: false
-  when: not(yum_repo_addr is undefined or yum_repo_addr is none or yum_repo_addr | trim == '') and local_repository_extra_keys is defined
+  when: not(yum_repository is undefined or yum_repository is none or yum_repository | trim == '') and local_repository_extra_keys is defined
 # if we retrieved a list of extra keys; then save the list that was retrieved and
 # download each of them in turn
 - block:
@@ -41,7 +41,7 @@
     with_dict: "{{local_repository_keys | default({})}}"
     when: key_map.status == 200
   become: true
-  when: not(yum_repo_addr is undefined or yum_repo_addr is none or yum_repo_addr | trim == '') and local_repository_extra_keys is defined
+  when: not(yum_repository is undefined or yum_repository is none or yum_repository | trim == '') and local_repository_extra_keys is defined
 # Here, we ssume that the yum_repository passed in by the user is a full CentOS mirror,
 # so we reconfigure the CentOS-*.repo files so that their baseurl lines all point to the
 # local mirror's URL (instead of the `mirror.centos.org` server) and we comment out the
@@ -50,8 +50,8 @@
   - name: Point CentOS repositories in CentOS-Base.repo file to mirror
     replace:
       dest: "/etc/yum.repos.d/CentOS-Base.repo"
-      regexp: '^#?(baseurl=http://)([^\/]+)\/.*(/\$releasever/.*)$'
-      replace: '\g<1>{{yum_repository}}/repo/CentOS\g<3>'
+      regexp: '^#?(baseurl=)(http://[^\/]+\/.*)(/\$releasever/.*)$'
+      replace: '\g<1>{{yum_repository}}\g<3>'
   - name: Comment out mirrorlist entries
     replace:
       dest: "/etc/yum.repos.d/CentOS-Base.repo"
