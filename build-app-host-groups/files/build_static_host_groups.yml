@@ -1,0 +1,30 @@
+# (c) 2017 DataNexus Inc.  All Rights Reserved
+---
+# if this is an AWS cloud, then set the facts for the application nodes
+# appropriately (this includes filtering for the application role if one
+# was provided)
+- set_fact:
+    hg_item_name: "{{host_group_item.name}}"
+    hg_item_inventory: "{{host_group_item.inventory | default({})}}"
+    hg_item_nodes: "{{host_group_item.node_list | default([])}}"
+    node_list_name: "{{host_group_item.name + '_nodes'}}"
+- set_fact:
+    "{{node_list_name}}": "{{hg_item_nodes}}"
+# Create an application host group (adding the ansible connection information
+# from the static inventory information that was passed in (if any)
+- add_host:
+    name: "{{item}}"
+    groups: "{{hg_item_name}}"
+    ansible_ssh_host: "{{(((hg_item_inventory[item] | default({})).ansible_ssh_host) | default(item))}}"
+    ansible_ssh_port: "{{(((hg_item_inventory[item] | default({})).ansible_ssh_port) | default(22))}}"
+    ansible_ssh_user: "{{(((hg_item_inventory[item] | default({})).ansible_ssh_user) | default(ansible_user))}}"
+    ansible_ssh_private_key_file: "{{(((hg_item_inventory[item] | default({})).ansible_ssh_private_key_file) | default(ansible_ssh_private_key_file))}}"
+  with_items: "{{hg_item_nodes}}"
+  run_once: true
+  when: hg_item_inventory != {}
+- add_host:
+    name: "{{item}}"
+    groups: "{{hg_item_name}}"
+  with_items: "{{hg_item_nodes}}"
+  run_once: true
+  when: hg_item_inventory == {}
