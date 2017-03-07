@@ -1,14 +1,12 @@
 # (c) 2017 DataNexus Inc.  All Rights Reserved
 ---
-# If we're running this command for to build a cluster in an AWS or
-# OpenStack cloud, then use the `ec2` or `openstack` command to (depending
-# on the `cloud` we're deploying to) gather the dynamic inventory information
-# that we need to build our Zookeeper host group (and build it)
+# If we're running this command for to build a cluster in AWS, then use the `ec2`
+# command to gather the dynamic inventory information that we need to build our
+# application host groups
 - block:
   - name: Run ec2 command to gather inventory information
     local_action: "shell common-utils/inventory/aws/ec2"
     register: di_output
-    run_once: true
   - set_fact:
       di_output_json: "{{di_output.stdout | from_json}}"
   - set_fact:
@@ -16,27 +14,16 @@
       tenant_nodes: "{{di_output_json | json_query('tag_Tenant_' + tenant)}}"
       project_nodes: "{{di_output_json | json_query('tag_Project_' + project)}}"
       domain_nodes: "{{di_output_json | json_query('tag_Domain_' + domain)}}"
-      application_nodes: "{{di_output_json | json_query('tag_Application_zookeeper')}}"
-  - set_fact:
-      zookeeper_nodes: "{{cloud_nodes | intersect(tenant_nodes) | intersect(project_nodes) | intersect(domain_nodes) | intersect(application_nodes)}}"
-    when: zookeeper_group is defined and zookeeper_group
-  - name: Create zookeeper host group (if requested)
-    add_host:
-      name: "{{item}}"
-      groups: "zookeeper"
-      ansible_ssh_host: "{{(di_output_json | json_query('_meta.hostvars.\"' + item + '\".ec2_private_ip_address'}}"
-      ansible_ssh_user: "{{ansible_user}}"
-      ansible_ssh_private_key_file: "{{private_key_path}}/{{cloud}}-{{di_output_json | json_query('_meta.hostvars.\"' + item + '\".ec2_key_name')}}-private-key.pem"
-    with_items: "{{zookeeper_nodes | default([])}}"
-    run_once: true
+  run_once: true
   when: not (inventory_type is undefined or inventory_type == "static") and cloud == "aws"
 
-# or run these commands to add the zookeeper host group for an osp cloud
+# If we're running this command for to build a cluster in OpenStack, then use the
+# `openstack` command to gather the dynamic inventory information that we need to
+# build our application host groups
 - block:
   - name: Run openstack command to gather inventory information
     local_action: "shell common-utils/inventory/osp/openstack"
     register: di_output
-    run_once: true
   - set_fact:
       di_output_json: "{{di_output.stdout | from_json}}"
   - set_fact:
@@ -44,63 +31,16 @@
       tenant_nodes: "{{(di_output_json | json_query('[\"meta-Tenant_' + tenant + '\"]')).0}}"
       project_nodes: "{{(di_output_json | json_query('[\"meta-Project_' + project + '\"]')).0}}"
       domain_nodes: "{{(di_output_json | json_query('[\"meta-Domain_' + domain + '\"]')).0}}"
-      application_nodes: "{{(di_output_json | json_query('[\"meta-Application_zookeeper\"]')).0}}"
-  - set_fact:
-      zookeeper_nodes: "{{cloud_nodes | intersect(tenant_nodes) | intersect(project_nodes) | intersect(domain_nodes) | intersect(application_nodes)}}"
-    when: zookeeper_group is defined and zookeeper_group
-  - name: Create zookeeper host group (if requested)
-    add_host:
-      name: "{{item}}"
-      groups: "zookeeper"
-      ansible_ssh_host: "{{(di_output_json | json_query('_meta.hostvars.\"' + item + '\".openstack.addresses.private') | map(attribute='addr') | map('regex_search','10\\.[0-9]+\\.0\\.[0-9]+') | list).0}}"
-      ansible_ssh_user: "{{ansible_user}}"
-      ansible_ssh_private_key_file: "{{private_key_path}}/{{di_output_json | json_query('_meta.hostvars.\"' + item + '\".openstack.key_name')}}.pem"
-    with_items: "{{zookeeper_nodes | default([])}}"
-    run_once: true
+  run_once: true
   when: not (inventory_type is undefined or inventory_type == "static") and cloud == "osp"
 
-# If we're running this command for to build a cluster in an AWS or
-# OpenStack cloud, then use the `ec2` or `openstack` command to (depending
-# on the `cloud` we're deploying to) gather the dynamic inventory information
-# that we need to build our application-specific host group (and build it)
-- block:
-  - set_fact:
-      application_nodes: "{{di_output_json | json_query('tag_Application_' + application)}}"
-  - set_fact:
-      app_nodes: "{{cloud_nodes | intersect(tenant_nodes) | intersect(project_nodes) | intersect(domain_nodes) | intersect(application_nodes)}}"
-  - add_host:
-      name: "{{item}}"
-      groups: "{{application}}"
-      ansible_ssh_host: "{{(di_output_json | json_query('_meta.hostvars.\"' + item + '\".ec2_private_ip_address'}}"
-      ansible_ssh_user: "{{ansible_user}}"
-      ansible_ssh_private_key_file: "{{private_key_path}}/{{cloud}}-{{di_output_json | json_query('_meta.hostvars.\"' + item + '\".ec2_key_name')}}-private-key.pem"
-    with_items: "{{app_nodes}}"
-    run_once: true
-  - set_fact:
-      "{{app_list_as}}": app_nodes
-    when: not (app_list_as is undefined or app_list_as is none or app_list_as | trim == '')
-  when: not (inventory_type is undefined or inventory_type == "static") and cloud == "aws"
+# and loop through the host_group_types list, building each host group (in turn)
+- include: ../files/build_host_groups.yml
+  with_items: "{{host_group_list}}"
+  loop_control:
+    loop_var: host_group_item
 
-# or run these commands to build our application-specific host group for an osp cloud
-- block:
-  - set_fact:
-      application_nodes: "{{(di_output_json | json_query('[\"meta-Application_' + application + '\"]')).0}}"
-  - set_fact:
-      app_nodes: "{{cloud_nodes | intersect(tenant_nodes) | intersect(project_nodes) | intersect(domain_nodes) | intersect(application_nodes)}}"
-  - add_host:
-      name: "{{item}}"
-      groups: "{{application}}"
-      ansible_ssh_host: "{{(di_output_json | json_query('_meta.hostvars.\"' + item + '\".openstack.addresses.private') | map(attribute='addr') | map('regex_search','10\\.[0-9]+\\.0\\.[0-9]+') | list).0}}"
-      ansible_ssh_user: "{{ansible_user}}"
-      ansible_ssh_private_key_file: "{{private_key_path}}/{{di_output_json | json_query('_meta.hostvars.\"' + item + '\".openstack.key_name')}}.pem"
-    with_items: "{{app_nodes}}"
-    run_once: true
-  - set_fact:
-      "{{app_list_as}}": app_nodes
-    when: not (app_list_as is undefined or app_list_as is none or app_list_as | trim == '')
-  when: not (inventory_type is undefined or inventory_type == "static") and cloud == "osp"
-
-# Otherwise, build the Zookeeper host group from the static inventory
+# Otherwise, build the application host groups from the static inventory
 # information that was passed in
 - add_host:
     name: "{{item}}"

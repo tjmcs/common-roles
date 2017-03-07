@@ -1,0 +1,69 @@
+# (c) 2017 DataNexus Inc.  All Rights Reserved
+---
+# if this is an AWS cloud, then set the facts for the application nodes
+# appropriately (this includes filtering for the application role if one
+# was provided)
+- block:
+  - set_fact:
+      application_nodes: "{{di_output_json | json_query('tag_Application_' + host_group_item.name)}}"
+  - set_fact:
+      node_list_name: "{{host_group_item.name + '_nodes'}}"
+      app_nodes: "{{cloud_nodes | intersect(tenant_nodes) | intersect(project_nodes) | intersect(domain_nodes) | intersect(application_nodes)}}"
+    when: host_group_item.role is undefined or host_group_item.role is none or host_group_item.role | trim == ''
+  - set_fact:
+      role_nodes: "{{di_output_json | json_query('tag_Application_' + host_group_item.role)}}"
+    when: not (host_group_item.role is undefined or host_group_item.role is none or host_group_item.role | trim == '')
+  - set_fact:
+      node_list_name: "{{host_group_item.name + '_' + host_group_item.role + '_nodes'}}"
+      app_nodes: "{{cloud_nodes | intersect(tenant_nodes) | intersect(project_nodes) | intersect(domain_nodes) | intersect(application_nodes) | intersect(role_nodes)}}"
+    when: not (host_group_item.role is undefined or host_group_item.role is none or host_group_item.role | trim == '')
+  when: cloud == "aws"
+# if this is an OpenStack cloud, then set the facts for the application nodes
+# appropriately (this includes filtering for the application role if one was provided
+- block:
+  - set_fact:
+      application_nodes: "{{(di_output_json | json_query('[\"meta-Application_' + host_group_item.name + '\"]')).0}}"
+  - set_fact:
+      node_list_name: "{{host_group_item.name + '_nodes'}}"
+      app_nodes: "{{cloud_nodes | intersect(tenant_nodes) | intersect(project_nodes) | intersect(domain_nodes) | intersect(application_nodes)}}"
+    when: host_group_item.role is undefined or host_group_item.role is none or host_group_item.role | trim == ''
+  - set_fact:
+      role_nodes: "{{(di_output_json | json_query('[\"meta-Role_' + host_group_item.role + '\"]')).0}}"
+    when: not (host_group_item.role is undefined or host_group_item.role is none or host_group_item.role | trim == '')
+  - set_fact:
+      node_list_name: "{{host_group_item.name + '_' + host_group_item.role + '_nodes'}}"
+      app_nodes: "{{cloud_nodes | intersect(tenant_nodes) | intersect(project_nodes) | intersect(domain_nodes) | intersect(application_nodes) | intersect(role_nodes)}}"
+    when: not (host_group_item.role is undefined or host_group_item.role is none or host_group_item.role | trim == '')
+  when: cloud == "osp"
+# and now that we have our list of "application nodes", set a fact containing that list and
+# create the appropriate host group
+- block:
+  - set_fact:
+      "{{node_list_name}}": "{{app_nodes}}"
+  - set_fact:
+      app_group_name: "{{host_group_item.name}}"
+  - set_fact:
+      app_group_name: "{{app_group_name + '_' + host_group_item.role}}"
+    when: not (host_group_item.role is undefined or host_group_item.role is none or host_group_item.role | trim == '')
+  # this is used to create a host group using AWS meta-data
+  - name: Create {{app_group_name}} host group from AWS meta-data
+    add_host:
+      name: "{{item}}"
+      groups: "{{app_group_name}}"
+      ansible_ssh_host: "{{(di_output_json | json_query('_meta.hostvars.\"' + item + '\".ec2_private_ip_address'}}"
+      ansible_ssh_user: "{{ansible_user}}"
+      ansible_ssh_private_key_file: "{{private_key_path}}/{{cloud}}-{{di_output_json | json_query('_meta.hostvars.\"' + item + '\".ec2_key_name')}}-private-key.pem"
+    with_items: "{{app_nodes | default([])}}"
+    run_once: true
+    when: cloud == "aws"
+  # this is used to create a host group using OpenStack meta-data
+  - name: Create {{app_group_name}} host group from OpenStack meta-data
+    add_host:
+      name: "{{item}}"
+      groups: "{{app_group_name}}"
+      ansible_ssh_host: "{{(di_output_json | json_query('_meta.hostvars.\"' + item + '\".openstack.addresses.private') | map(attribute='addr') | map('regex_search','10\\.[0-9]+\\.0\\.[0-9]+') | list).0}}"
+      ansible_ssh_user: "{{ansible_user}}"
+      ansible_ssh_private_key_file: "{{private_key_path}}/{{di_output_json | json_query('_meta.hostvars.\"' + item + '\".openstack.key_name')}}.pem"
+    with_items: "{{app_nodes | default([])}}"
+    run_once: true
+    when: cloud == "osp"
