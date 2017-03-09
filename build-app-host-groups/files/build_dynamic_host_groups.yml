@@ -6,10 +6,8 @@
 - set_fact:
     hg_item_role: "{{host_group_item.role}}"
   when: not (host_group_item.role is undefined or host_group_item.role is none or host_group_item.role | trim == '')
-- set_fact: invert_match=false
 - set_fact:
-    invert_match: "{{host_group_item.invert_match}}"
-  when: not (host_group_item.invert_match is undefined or host_group_item.invert_match is none or host_group_item.invert_match | trim == '')
+    invert_match: "{{host_group_item.invert_match | default(false)}}"
 - block:
   - set_fact:
       application_nodes: "{{di_output_json | json_query('tag_Application_' + host_group_item.name)}}"
@@ -60,25 +58,49 @@
   - set_fact:
       app_group_name: "{{app_group_name + '_' + hg_item_role}}"
     when: hg_item_role is defined and (invert_match is undefined or not (invert_match))
-  # this is used to create a host group using AWS meta-data
+# this block is used to create a host group (and skip host group?) using AWS meta-data
+- block:
   - name: Create {{app_group_name}} host group from AWS meta-data
     add_host:
       name: "{{item}}"
       groups: "{{app_group_name}}"
-      ansible_ssh_host: "{{(di_output_json | json_query('_meta.hostvars.\"' + item + '\".ec2_private_ip_address'}}"
+      ansible_ssh_host: "{{di_output_json | json_query('_meta.hostvars.\"' + item + '\".ec2_private_ip_address')}}"
       ansible_ssh_user: "{{ansible_user}}"
       ansible_ssh_private_key_file: "{{private_key_path}}/{{cloud}}-{{di_output_json | json_query('_meta.hostvars.\"' + item + '\".ec2_key_name')}}-private-key.pem"
     with_items: "{{app_nodes | default([])}}"
+    when: (di_output_json | json_query('_meta.hostvars."' + item + '".ec2_private_ip_address')) not in (skip_nodes_list | default([]))
     run_once: true
-    when: cloud == "aws"
-  # this is used to create a host group using OpenStack meta-data
+  - name: Create {{app_group_name}}_skip host group from AWS meta-data
+    add_host:
+      name: "{{item}}"
+      groups: "{{app_group_name + '_skip'}}"
+      ansible_ssh_host: "{{di_output_json | json_query('_meta.hostvars.\"' + item + '\".ec2_private_ip_address')}}"
+      ansible_ssh_user: "{{ansible_user}}"
+      ansible_ssh_private_key_file: "{{private_key_path}}/{{cloud}}-{{di_output_json | json_query('_meta.hostvars.\"' + item + '\".ec2_key_name')}}-private-key.pem"
+    with_items: "{{app_nodes | default([])}}"
+    when: (di_output_json | json_query('_meta.hostvars."' + item + '".ec2_private_ip_address')) in (skip_nodes_list | default([]))
+    run_once: true
+  when: cloud == "aws"
+# this block is used to create a host group (and skip host group?) using OpenStack meta-data
+- block:
   - name: Create {{app_group_name}} host group from OpenStack meta-data
     add_host:
       name: "{{item}}"
       groups: "{{app_group_name}}"
-      ansible_ssh_host: "{{(di_output_json | json_query('_meta.hostvars.\"' + item + '\".openstack.addresses.private') | map(attribute='addr') | map('regex_search','10\\.[0-9]+\\.0\\.[0-9]+') | list).0}}"
+      ansible_ssh_host: "{{(di_output_json | json_query('_meta.hostvars.\"' + item + '\".openstack.addresses.private') | map(attribute='addr') | map('regex_search', osp_private_net_regex) | list).0}}"
       ansible_ssh_user: "{{ansible_user}}"
       ansible_ssh_private_key_file: "{{private_key_path}}/{{di_output_json | json_query('_meta.hostvars.\"' + item + '\".openstack.key_name')}}.pem"
     with_items: "{{app_nodes | default([])}}"
     run_once: true
-    when: cloud == "osp"
+    when: not (((di_output_json | json_query('_meta.hostvars."' + item + '".openstack.addresses.private') | map(attribute='addr') | map('regex_search', osp_private_net_regex) | list).0) in (skip_nodes_list | default([])))
+  - name: Create {{app_group_name}}_skip host group from OpenStack meta-data
+    add_host:
+      name: "{{item}}"
+      groups: "{{app_group_name + '_skip'}}"
+      ansible_ssh_host: "{{(di_output_json | json_query('_meta.hostvars.\"' + item + '\".openstack.addresses.private') | map(attribute='addr') | map('regex_search', osp_private_net_regex) | list).0}}"
+      ansible_ssh_user: "{{ansible_user}}"
+      ansible_ssh_private_key_file: "{{private_key_path}}/{{di_output_json | json_query('_meta.hostvars.\"' + item + '\".openstack.key_name')}}.pem"
+    with_items: "{{app_nodes | default([])}}"
+    run_once: true
+    when: ((di_output_json | json_query('_meta.hostvars."' + item + '".openstack.addresses.private') | map(attribute='addr') | map('regex_search', osp_private_net_regex) | list).0) in (skip_nodes_list | default([]))
+  when: cloud == "osp"
