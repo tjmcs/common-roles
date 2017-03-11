@@ -7,6 +7,7 @@
   - name: Run ec2 command to gather inventory information
     local_action: "shell common-utils/inventory/aws/ec2"
     register: di_output
+    run_once: true
   - set_fact:
       di_output_json: "{{di_output.stdout | from_json}}"
   - set_fact:
@@ -14,7 +15,6 @@
       tenant_nodes: "{{di_output_json | json_query('tag_Tenant_' + tenant)}}"
       project_nodes: "{{di_output_json | json_query('tag_Project_' + project)}}"
       domain_nodes: "{{di_output_json | json_query('tag_Domain_' + domain)}}"
-  run_once: true
   when: cloud == "aws"
 
 # If we're running this command for to build a cluster in OpenStack, then use the
@@ -24,6 +24,7 @@
   - name: Run openstack command to gather inventory information
     local_action: "shell common-utils/inventory/osp/openstack"
     register: di_output
+    run_once: true
   - set_fact:
       di_output_json: "{{di_output.stdout | from_json}}"
   - set_fact:
@@ -31,7 +32,6 @@
       tenant_nodes: "{{(di_output_json | json_query('[\"meta-Tenant_' + tenant + '\"]')).0}}"
       project_nodes: "{{(di_output_json | json_query('[\"meta-Project_' + project + '\"]')).0}}"
       domain_nodes: "{{(di_output_json | json_query('[\"meta-Domain_' + domain + '\"]')).0}}"
-  run_once: true
   when: cloud == "osp"
 
 # if we're not working with a static inventory (i.e. if wer'e working with inventory from an AWS

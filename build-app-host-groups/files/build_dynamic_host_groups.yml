@@ -4,8 +4,7 @@
 # appropriately (this includes filtering for the application role if one
 # was provided)
 - set_fact:
-    hg_item_role: "{{host_group_item.role}}"
-  when: not (host_group_item.role is undefined or host_group_item.role is none or host_group_item.role | trim == '')
+    hg_item_role: "{{host_group_item.role | default('')}}"
 - set_fact:
     invert_match: "{{host_group_item.invert_match | default(false)}}"
 - block:
@@ -14,18 +13,18 @@
   - set_fact:
       node_list_name: "{{host_group_item.name + '_nodes'}}"
       app_nodes: "{{cloud_nodes | intersect(tenant_nodes) | intersect(project_nodes) | intersect(domain_nodes) | intersect(application_nodes)}}"
-    when: hg_item_role is undefined
+    when: hg_item_role == ''
   - set_fact:
-      role_nodes: "{{di_output_json | json_query('tag_Application_' + hg_item_role)}}"
-    when: hg_item_role is defined
+      role_nodes: "{{di_output_json | json_query('tag_Role_' + hg_item_role)}}"
+    when: hg_item_role != ''
   - set_fact:
       node_list_name: "{{host_group_item.name + '_' + hg_item_role + '_nodes'}}"
       app_nodes: "{{cloud_nodes | intersect(tenant_nodes) | intersect(project_nodes) | intersect(domain_nodes) | intersect(application_nodes) | intersect(role_nodes)}}"
-    when: hg_item_role is defined and (invert_match is undefined or not (invert_match))
+    when: hg_item_role != '' and (invert_match is undefined or not (invert_match))
   - set_fact:
       node_list_name: "{{host_group_item.name + '_nodes'}}"
       app_nodes: "{{cloud_nodes | intersect(tenant_nodes) | intersect(project_nodes) | intersect(domain_nodes) | intersect(application_nodes) | difference(role_nodes)}}"
-    when: hg_item_role is defined and invert_match is defined and invert_match
+    when: hg_item_role != '' and invert_match is defined and invert_match
   when: cloud == "aws"
 # if this is an OpenStack cloud, then set the facts for the application nodes
 # appropriately (this includes filtering for the application role if one was provided
@@ -35,18 +34,18 @@
   - set_fact:
       node_list_name: "{{host_group_item.name + '_nodes'}}"
       app_nodes: "{{cloud_nodes | intersect(tenant_nodes) | intersect(project_nodes) | intersect(domain_nodes) | intersect(application_nodes)}}"
-    when: hg_item_role is undefined
+    when: hg_item_role == ''
   - set_fact:
       role_nodes: "{{(di_output_json | json_query('[\"meta-Role_' + hg_item_role + '\"]')).0}}"
-    when: hg_item_role is defined
+    when: hg_item_role != ''
   - set_fact:
       node_list_name: "{{host_group_item.name + '_' + hg_item_role + '_nodes'}}"
       app_nodes: "{{cloud_nodes | intersect(tenant_nodes) | intersect(project_nodes) | intersect(domain_nodes) | intersect(application_nodes) | intersect(role_nodes)}}"
-    when: hg_item_role is defined and (invert_match is undefined or not (invert_match))
+    when: hg_item_role != '' and (invert_match is undefined or not (invert_match))
   - set_fact:
       node_list_name: "{{host_group_item.name + '_nodes'}}"
       app_nodes: "{{cloud_nodes | intersect(tenant_nodes) | intersect(project_nodes) | intersect(domain_nodes) | intersect(application_nodes) | difference(role_nodes)}}"
-    when: hg_item_role is defined and invert_match is defined and invert_match
+    when: hg_item_role != '' and invert_match is defined and invert_match
   when: cloud == "osp"
 # and now that we have our list of "application nodes", set a fact containing that list and
 # create the appropriate host group
@@ -57,7 +56,7 @@
       app_group_name: "{{host_group_item.name}}"
   - set_fact:
       app_group_name: "{{app_group_name + '_' + hg_item_role}}"
-    when: hg_item_role is defined and (invert_match is undefined or not (invert_match))
+    when: hg_item_role != '' and (invert_match is undefined or not (invert_match))
 # this block is used to create a host group (and skip host group?) using AWS meta-data
 - block:
   - name: Create {{app_group_name}} host group from AWS meta-data
