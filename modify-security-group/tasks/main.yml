@@ -1,0 +1,22 @@
+# (c) 2016 DataNexus Inc.  All Rights Reserved
+#
+#
+---
+- name: apply postgresql firewall rules
+  local_action:
+    module: ec2_group
+      name: sg_postgresql
+      description: "SSH ingress and unrestricted egress rules (ansible)"
+      vpc_id: "{{ vpc }}"
+      region: "{{ ec2_region }}"
+      rules:
+        - proto: tcp
+          from_port: 5432
+          to_port: 5432
+          cidr_ip: 0.0.0.0/0
+      rules_egress:
+        # Allow all outbound
+        - proto: all
+          cidr_ip: 0.0.0.0/0
+      register: sg_postgresql
+      when: cloud == "aws"
