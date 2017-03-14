@@ -1,91 +1,71 @@
 # (c) 2016 DataNexus Inc.  All Rights Reserved
 ---
-# add a local repository to the remote machine if one was defined
-# (this is done by defining a URL to a '.repo' file on a server
-# that is accessible on the local network using the local_repository_url
-# variable)
+# If a repo_name was passed in by the user then reconfigure the {{repository_name}}.repo
+# file so that the baseurl lines all point to the local mirror's URL (instead of the default
+# server for that repository) and comment out the mirrorlist lines in that same file
+- set_fact:
+    repo_name: "{{repository_name | default('CentOS-Base')}}"
+    default_baseurl_regex: "^#?(baseurl=)(http://[^\\/]+\\/.*)(/\\$releasever/.*)$"
+    default_baseurl_relpx: "\\g<1>{{yum_repository}}\\g<3>"
+    default_mirrorlist_regex: "^(mirrorlist=http://mirrorlist.centos.org/.*)$"
+    default_mirrorlist_replx: "#\\g<1>"
 - block:
-  - name: "Get a local yum repository file (if the URL for that was defined)"
-    uri:
-      url: "{{local_repository_url}}"
-      dest: "/etc/yum.repos.d/"
-      return_content: yes
-    register: local_repo_response
+  # Backup the default repository files (if we haven't already) and then point them
+  # at the new repositories
+  - name: Backup default {{repo_name | default('CentOS-Base')}}.repo file
+    copy:
+      src: "/etc/yum.repos.d/{{repo_name}}.repo"
+      dest: "/etc/yum.repos.d/.{{repo_name}}.repo.bak"
+      remote_src: true
+      mode: 0644
+      force: no
+  - name: Backup default {{repo_name | default('CentOS-Base')}}-testing.repo file (if exists)
+    copy:
+      src: "/etc/yum.repos.d/{{repo_name}}-testing.repo"
+      dest: "/etc/yum.repos.d/.{{repo_name}}-testing.repo.bak"
+      remote_src: true
+      mode: 0644
+      force: no
     failed_when: false
-  become: true
-  when: not(yum_repository is undefined or yum_repository is none or yum_repository | trim == '') and local_repository_url is defined
-# and do the same for the list of extra keys (if a URL was defined for that)
-- block:
-  - name: "Get list of extra keys to download"
-    uri: url="{{local_repository_extra_keys}}" return_content=yes
-    register: key_map
+  - name: And remove {{repo_name | default('CentOS-Base')}}-testing.repo file (if exists)
+    file:
+      path: "/etc/yum.repos.d/{{repo_name}}-testing.repo"
+      state: absent
     failed_when: false
-  when: not(yum_repository is undefined or yum_repository is none or yum_repository | trim == '') and local_repository_extra_keys is defined
-# if we retrieved a list of extra keys; then save the list that was retrieved and
-# download each of them in turn
-- block:
-  - set_fact: local_repository_keys="{{key_map.json | default({})}}"
-    when: key_map.status == 200
-  - name: Download extra keys via URLs embedded in the key map
-    uri:
-      url: "{{item.value}}"
-      dest: "/etc/pki/rpm-gpg/"
-    with_dict: "{{local_repository_keys | default({})}}"
-    when: (key_map.status | default(-1)) == 200
-    failed_when: false
-  # then add the keys that were downloaded to the list of trusted keys for RPM installs
-  - name: If we retrieved a key map, then add those keys to list of trusted keys for RPM installs
-    command: "rpm --import /etc/pki/rpm-gpg/{{item.value | basename}}"
-    args:
-      warn: no
-    with_dict: "{{local_repository_keys | default({})}}"
-    when: key_map.status == 200
-  become: true
-  when: not(yum_repository is undefined or yum_repository is none or yum_repository | trim == '') and local_repository_extra_keys is defined
-# Here, we ssume that the yum_repository passed in by the user is a full CentOS mirror,
-# so we reconfigure the CentOS-*.repo files so that their baseurl lines all point to the
-# local mirror's URL (instead of the `mirror.centos.org` server) and we comment out the
-# mirrorlist lines in those same files
-- block:
-  - name: Point CentOS repositories in CentOS-Base.repo file to mirror
+  - name: Point repositories in {{repo_name | default('CentOS-Base')}}.repo file to mirror
     replace:
-      dest: "/etc/yum.repos.d/CentOS-Base.repo"
-      regexp: '^#?(baseurl=)(http://[^\/]+\/.*)(/\$releasever/.*)$'
-      replace: '\g<1>{{yum_repository}}\g<3>'
+      dest: "/etc/yum.repos.d/{{repo_name | default('CentOS-Base')}}.repo"
+      regexp: "{{((regex_repl_vals | default([])).baseurl | default([])).regex | default(default_baseurl_regex)}}"
+      replace: "{{((regex_repl_vals | default([])).baseurl | default([])).replx | default(default_baseurl_relpx)}}"
   - name: Comment out mirrorlist entries
     replace:
-      dest: "/etc/yum.repos.d/CentOS-Base.repo"
-      regexp: '^(mirrorlist=http://mirrorlist.centos.org/.*)$'
-      replace: '#\g<1>'
+      dest: "/etc/yum.repos.d/{{repo_name | default('CentOS-Base')}}.repo"
+      regexp: "{{((regex_repl_vals | default([])).mirrorlist | default([])).regex | default(default_mirrorlist_regex)}}"
+      replace: "{{((regex_repl_vals | default([])).mirrorlist | default([])).replx | default(default_mirrorlist_replx)}}"
   become: true
   when: not(yum_repository is undefined or yum_repository is none or yum_repository | trim == '')
-# if a yum_repository was not passed in, then we switched the baseurl lines in the CentOS-*.repo
-# files so that they point back to the `mirror.centos.org` server again, comment them out,
-# and uncomment the mirrorlist entries in those same files (ensuring that the standard
-# CentOS mirrors will be used for `yum install` commands)
+# if a repo_name was not passed in, then we copy the original files back from the backup copies
+# we created earlier
 - block:
-  - name: Switch CentOS repositories in CentOS-Base.repo file back to standard mirrors
-    replace:
-      dest: "/etc/yum.repos.d/CentOS-Base.repo"
-      regexp: '^(baseurl=http://)([^\/]+)\/.*(/\$releasever/.*)$'
-      replace: '#\g<1>mirror.centos.org/centos\g<3>'
-  - name: Uncomment mirrorlist entries
-    replace:
-      dest: "/etc/yum.repos.d/CentOS-Base.repo"
-      regexp: '^#(mirrorlist=http://mirrorlist.centos.org/.*)$'
-      replace: '\g<1>'
+   # restore the default repository files
+  - name: Restore the default {{repo_name | default('CentOS-Base')}}.repo file from the backup copy
+    copy:
+      src: "/etc/yum.repos.d/.{{repo_name}}.repo.bak"
+      dest: "/etc/yum.repos.d/{{repo_name}}.repo"
+      remote_src: true
+      force: true
+      mode: 0644
+  - name: Restore the default {{repo_name | default('CentOS-Base')}}-testing.repo file from the backup copy
+    become: true
+    copy:
+      src: "/etc/yum.repos.d/.{{repo_name}}.repo.bak"
+      dest: "/etc/yum.repos.d/{{repo_name}}.repo"
+      remote_src: true
+      mode: 0644
+      force: true
+    ignore_errors: yes
   become: true
   when: yum_repository is undefined or yum_repository is none or yum_repository | trim == ''
-# if a local_repository_url value exists but the response from that URL was not an HTTP 200
-# response, ensure the file that would have been downloaded from that URL is absent (in case
-# it was there from a previous, successful attempt to download it from that URL)
-- block:
-  - name: remove local repository file (if it exists)
-    file:
-      path: "/etc/yum.repos.d/{{local_repository_url | basename}}"
-      state: absent
-  become: true
-  when: local_repository_url is defined and local_repo_response.status != 200
 # Finally, ensure that we clean up the yum cache and reload the (potentially new)
 # list of yum repositories
 - name: "remove all repository entries from the current yum cache"
