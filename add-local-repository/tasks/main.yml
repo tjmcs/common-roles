@@ -19,19 +19,6 @@
       remote_src: true
       mode: 0644
       force: no
-  - name: Backup default {{repo_name | default('CentOS-Base')}}-testing.repo file (if exists)
-    copy:
-      src: "/etc/yum.repos.d/{{repo_name}}-testing.repo"
-      dest: "/etc/yum.repos.d/.{{repo_name}}-testing.repo.bak"
-      remote_src: true
-      mode: 0644
-      force: no
-    failed_when: false
-  - name: And remove {{repo_name | default('CentOS-Base')}}-testing.repo file (if exists)
-    file:
-      path: "/etc/yum.repos.d/{{repo_name}}-testing.repo"
-      state: absent
-    failed_when: false
   - name: Point repositories in {{repo_name | default('CentOS-Base')}}.repo file to mirror
     replace:
       dest: "/etc/yum.repos.d/{{repo_name | default('CentOS-Base')}}.repo"
@@ -47,25 +34,18 @@
 # if a repo_name was not passed in, then we copy the original files back from the backup copies
 # we created earlier
 - block:
-   # restore the default repository files
-  - name: Restore the default {{repo_name | default('CentOS-Base')}}.repo file from the backup copy
-    copy:
-      src: "/etc/yum.repos.d/.{{repo_name}}.repo.bak"
-      dest: "/etc/yum.repos.d/{{repo_name}}.repo"
-      remote_src: true
-      force: true
-      mode: 0644
-  - name: Restore the default {{repo_name | default('CentOS-Base')}}-testing.repo file from the backup copy
-    become: true
+  - name: Check if backup of {{repo_name | default('CentOS-Base')}}.repo file exists
+    stat: path="/etc/yum.repos.d/.{{repo_name}}.repo.bak"
+    register: check_path
+  # restore the default repository files
+  - name: If it exists, restore the default {{repo_name | default('CentOS-Base')}}.repo file from the backup
     copy:
       src: "/etc/yum.repos.d/.{{repo_name}}.repo.bak"
       dest: "/etc/yum.repos.d/{{repo_name}}.repo"
       remote_src: true
       mode: 0644
-      force: true
-    ignore_errors: yes
   become: true
-  when: yum_repository is undefined or yum_repository is none or yum_repository | trim == ''
+  when: check_path.stat.exists and (yum_repository is undefined or yum_repository is none or yum_repository | trim == '')
 # Finally, ensure that we clean up the yum cache and reload the (potentially new)
 # list of yum repositories
 - name: "remove all repository entries from the current yum cache"
