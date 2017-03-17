@@ -1,0 +1,36 @@
+# (c) 2016 DataNexus Inc.  All Rights Reserved
+---
+# if an interface description (a dict with the value that should be matched
+# and it's type) was passed in, then extract those values
+- set_fact:
+    iface_type: "{{iface_desc.type | default('name')}}"
+    iface_val: "{{iface_desc.val | default('')}}"
+# if what was passed in was a dict containing a type/val pair
+# (where the type is 'name' and the value is the name of the
+# interface we're interested in), or if the value passed in was
+# simply a string (and not a dict) containing the name of an
+# interface, then pass that value back
+- set_fact:
+    "{{as_fact | default('iface_desc')}}": "{{iface_val}}"
+  when: iface_type == 'name'
+# otherwise, we were passed a dict containing a type/val
+# pair where the type is 'cidr' and the value is a CIDR string
+# that describes the network that the interface we're interested
+# in is mapped to; in that case, get a list of the matching IP
+# IP addresses and find the one that matches our 
+- block:
+  - name: Get list of IP addresses
+    shell: "/usr/sbin/ip addr list | grep -w 'inet' | awk '{ print $2 }'"
+    register: get_iface_addr_list_out
+  - set_fact:
+      ip_addr_list: "{{get_iface_addr_list_out.stdout.split('\n')}}"
+  - name: Get list of network names
+    shell: "/usr/sbin/ip addr list | grep -w 'inet' | awk '{ print $NF }'"
+    register: get_iface_name_list_out
+  - set_fact:
+      ip_name_list: "{{get_iface_name_list_out.stdout.split('\n')}}"
+  - set_fact:
+      "{{as_fact | default('iface_desc')}}": "{{ip_name_list[item.0]}}"
+    with_indexed_items: "{{ip_addr_list}}"
+    when: item.1 in (ip_addr_list | ipaddr(iface_val))
+  when: iface_type == 'cidr'
