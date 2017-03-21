@@ -44,8 +44,9 @@
       dest: "/etc/yum.repos.d/{{repo_name}}.repo"
       remote_src: true
       mode: 0644
+    when: check_path.stat.exists
   become: true
-  when: check_path.stat.exists and (yum_repository is undefined or yum_repository is none or yum_repository | trim == '')
+  when: yum_repository is undefined or yum_repository is none or yum_repository | trim == ''
 # Finally, ensure that we clean up the yum cache and reload the (potentially new)
 # list of yum repositories
 - name: "remove all repository entries from the current yum cache"
