@@ -1,0 +1,12 @@
+# (c) 2016 DataNexus Inc.  All Rights Reserved
+---
+# if what was passed in was a 'name' description, then returned
+# the name of the interface itself (the 'val' field in the description)
+- set_fact:
+    "{{iface_description.as_var}}": "{{iface_description.val}}"
+  when: iface_description.type == 'name'
+# otherwise, we need to loop through the `ip_addr_list` and find the
+# value that is in the input CIDR block, then return the corresponding
+# interface name from the `iface_name_list`
+- include: ../files/get_iface_names.yml
+  when: iface_description.type == 'cidr'

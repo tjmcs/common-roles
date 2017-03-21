@@ -1,0 +1,22 @@
+# (c) 2016 DataNexus Inc.  All Rights Reserved
+---
+# first, get a list of the IP addresses and the corresponding
+# list of network names for this host
+- name: Get list of IP addresses
+  shell: "/usr/sbin/ip addr list | grep -w 'inet' | awk '{ print $2 }'"
+  register: get_iface_addr_list_out
+- set_fact:
+    ip_addr_list: "{{get_iface_addr_list_out.stdout.split('\n')}}"
+- name: Get list of interface names
+  shell: "/usr/sbin/ip addr list | grep -w 'inet' | awk '{ print $NF }'"
+  register: get_iface_name_list_out
+- set_fact:
+    iface_name_list: "{{get_iface_name_list_out.stdout.split('\n')}}"
+# then for each of the interface description values that were
+# passed in, determine what should be returned based on the 'type'
+# in that description (currently either 'cidr' or 'name' are
+# supported by this role)
+- include: ../files/set_return_vals.yml
+  with_items: "{{iface_descriptions}}"
+  loop_control:
+    loop_var: iface_description
