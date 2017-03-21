@@ -44,7 +44,7 @@
     regexp: "^proxy="
     line:  "proxy={{http_proxy}}"
     state: present
-  when: not (http_proxy is undefined or http_proxy is none or http_proxy | trim == '')
+  when: not (http_proxy is undefined or http_proxy is none or http_proxy | trim == '') and (skip_yum_proxy is undefined or not (skip_yum_proxy))
 - name: remove http_proxy from yum.conf if defined
   become: true
   lineinfile:
@@ -59,7 +59,7 @@
     regexp: "^proxy_username="
     line:  "proxy_username={{proxy_username}}"
     state: present
-  when: not (proxy_username is undefined or proxy_username is none or proxy_username | trim == '')
+  when: not (proxy_username is undefined or proxy_username is none or proxy_username | trim == '')  and (skip_yum_proxy is undefined or not (skip_yum_proxy))
 - name: remove proxy_username from yum.conf if defined
   become: true
   lineinfile:
@@ -74,7 +74,7 @@
     regexp: "^proxy_password="
     line:  "proxy_password={{proxy_password}}"
     state: present
-  when: not (proxy_password is undefined or proxy_password is none or proxy_password | trim == '')
+  when: not (proxy_password is undefined or proxy_password is none or proxy_password | trim == '')  and (skip_yum_proxy is undefined or not (skip_yum_proxy))
 - name: remove proxy_password from yum.conf if defined
   become: true
   lineinfile:
