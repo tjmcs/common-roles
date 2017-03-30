@@ -6,3 +6,4 @@
     name: "{{ (package_list | default([])) | join(',') }}"
     state: present
   environment: "{{ proxy_env | default({}) }}"
+  when: not (package_list is undefined or package_list is none or package_list == [])
