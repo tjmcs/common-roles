@@ -6,6 +6,7 @@
 - set_fact:
     hg_item_name: "{{host_group_item.name}}"
     node_list_name: "{{host_group_item.name + '_nodes'}}"
+    inventory_included: "{{not (host_group_item.inventory_file is undefined or host_group_item.inventory_file is none or host_group_item.inventory_file | trim == '')}}"
 # if an 'inventory_file' **was not** provided in the 'host_group_item'
 # map, then set up our inventory map and node list from the 'inventory'
 # and 'node_list' fields in the 'host_group_item' map
@@ -14,7 +15,7 @@
       hg_item_inventory: "{{host_group_item.inventory | default({})}}"
       hg_item_nodes: "{{host_group_item.node_list | default([])}}"
   run_once: true
-  when: (host_group_item.inventory_file | default('')) == ''
+  when: not inventory_included
 # if an 'inventory_file' **was** provided in the 'host_group_item' map,
 # then set up our inventory map and node list by from the contents of
 # the `inventory_file` passed in as part of the 'host_group_item' map
@@ -27,7 +28,7 @@
   - set_fact:
       hg_item_nodes: "{{ hg_item_inventory | json_query('keys(@)') }}"
   run_once: true
-  when: (host_group_item.inventory_file | default('')) != ''
+  when: inventory_included
 # set the node list fact based on the input 'node_list_name'
 - set_fact:
     "{{node_list_name}}": "{{hg_item_nodes}}"
