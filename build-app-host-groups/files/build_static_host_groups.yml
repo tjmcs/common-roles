@@ -21,12 +21,18 @@
 # the `inventory_file` passed in as part of the 'host_group_item' map
 # (by parsing it as a static inventory file)
 - block:
-  - local_action: "shell {{playbook_dir}}/common-utils/inventory/static/hostsfile.py --filename {{host_group_item.inventory_file}}"
-    register: zookeeper_inventory_out
+  - local_action: "shell {{playbook_dir}}/common-utils/inventory/static/hostsfile.py --filename {{host_group_item.inventory_file}} --list"
+    register: inventory_out
   - set_fact:
-      hg_item_inventory: "{{(zookeeper_inventory_out.stdout | from_json)._meta.hostvars}}"
+      hg_item_inventory_out_json: "{{inventory_out.stdout | from_json}}"
+  - set_fact:
+      hg_item_inventory: "{{hg_item_inventory_out_json._meta.hostvars}}"
+  - set_fact:
+      hg_item_nodes: "{{hg_item_inventory_out_json[hg_item_name].hosts}}"
+    when: (hg_item_inventory_out_json[hg_item_name] | default({})) != {}
   - set_fact:
       hg_item_nodes: "{{ hg_item_inventory | json_query('keys(@)') }}"
+    when: (hg_item_inventory_out_json[hg_item_name] | default({})) == {}
   run_once: true
   when: inventory_included
 # set the node list fact based on the input 'node_list_name'
