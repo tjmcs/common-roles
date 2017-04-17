@@ -15,7 +15,7 @@
       tenant_nodes: "{{di_output_json | json_query('tag_Tenant_' + tenant)}}"
       project_nodes: "{{di_output_json | json_query('tag_Project_' + project)}}"
       domain_nodes: "{{di_output_json | json_query('tag_Domain_' + domain)}}"
-  when: cloud == "aws"
+  when: inventory_type == 'dynamic' and cloud == "aws"
 
 # If we're running this command for to build a cluster in OpenStack, then use the
 # `openstack` command to gather the dynamic inventory information that we need to
@@ -32,7 +32,7 @@
       tenant_nodes: "{{(di_output_json | json_query('[\"meta-Tenant_' + tenant + '\"]')).0}}"
       project_nodes: "{{(di_output_json | json_query('[\"meta-Project_' + project + '\"]')).0}}"
       domain_nodes: "{{(di_output_json | json_query('[\"meta-Domain_' + domain + '\"]')).0}}"
-  when: cloud == "osp"
+  when: inventory_type == 'dynamic' and cloud == "osp"
 
 # if we're not working with a static inventory (i.e. if wer'e working with inventory from an AWS
 # or OpenStack cloud), then loop through the host_group_types list, building each host group
@@ -41,7 +41,7 @@
   with_items: "{{host_group_list}}"
   loop_control:
     loop_var: host_group_item
-  when: cloud == "aws" or cloud == "osp"
+  when: inventory_type == 'dynamic'
 
 # Otherwise, if we are working with a static inventory, then loop through the host_group_types list,
 # building each host group (in turn)
@@ -49,4 +49,4 @@
   with_items: "{{host_group_list}}"
   loop_control:
     loop_var: host_group_item
-  when: cloud == "vagrant"
+  when: inventory_type == 'static'
