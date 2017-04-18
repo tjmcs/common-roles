@@ -62,7 +62,7 @@
   - name: Create {{app_group_name}} host group from AWS meta-data
     add_host:
       name: "{{item}}"
-      groups: "{{app_group_name}}"
+      groups: "{{app_group_name}},{{node_list_name}}"
       ansible_ssh_host: "{{di_output_json | json_query('_meta.hostvars.\"' + item + '\".ec2_private_ip_address')}}"
       ansible_ssh_user: "{{ansible_user}}"
       ansible_ssh_private_key_file: "{{private_key_path}}/{{cloud}}-{{di_output_json | json_query('_meta.hostvars.\"' + item + '\".ec2_key_name')}}-private-key.pem"
@@ -83,7 +83,7 @@
   - name: Create {{app_group_name}} host group from OpenStack meta-data
     add_host:
       name: "{{item}}"
-      groups: "{{app_group_name}}"
+      groups: "{{app_group_name}},{{node_list_name}}"
       ansible_ssh_host: "{{(di_output_json | json_query('_meta.hostvars.\"' + item + '\".openstack.addresses.private[].addr') | list).0}}"
       ansible_ssh_user: "{{ansible_user}}"
       ansible_ssh_private_key_file: "{{private_key_path}}/{{di_output_json | json_query('_meta.hostvars.\"' + item + '\".openstack.key_name')}}.pem"

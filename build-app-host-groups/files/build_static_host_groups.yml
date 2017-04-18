@@ -42,7 +42,7 @@
 # from the static inventory information that was passed in or parsed (if any)
 - add_host:
     name: "{{item}}"
-    groups: "{{hg_item_name}}"
+    groups: "{{hg_item_name}},{{node_list_name}}"
     ansible_ssh_host: "{{(((hg_item_inventory[item] | default({})).ansible_ssh_host) | default(item))}}"
     ansible_ssh_port: "{{(((hg_item_inventory[item] | default({})).ansible_ssh_port) | default(22))}}"
     ansible_ssh_user: "{{(((hg_item_inventory[item] | default({})).ansible_ssh_user) | default(ansible_user))}}"
@@ -54,7 +54,7 @@
 # group from the input node list
 - add_host:
     name: "{{item}}"
-    groups: "{{hg_item_name}}"
+    groups: "{{hg_item_name}},{{node_list_name}}"
   with_items: "{{hg_item_nodes}}"
   run_once: true
   when: hg_item_inventory == {}
