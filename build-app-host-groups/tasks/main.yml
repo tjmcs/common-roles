@@ -1,22 +1,5 @@
 # (c) 2017 DataNexus Inc.  All Rights Reserved
 ---
-# If we're running this command for to build a cluster in AWS, then use the `ec2`
-# command to gather the dynamic inventory information that we need to build our
-# application host groups
-- block:
-  - name: Run ec2 command to gather inventory information
-    local_action: "shell common-utils/inventory/aws/ec2"
-    register: di_output
-    run_once: true
-  - set_fact:
-      di_output_json: "{{di_output.stdout | from_json}}"
-  - set_fact:
-      cloud_nodes: "{{di_output_json | json_query('tag_Cloud_' + cloud)}}"
-      tenant_nodes: "{{di_output_json | json_query('tag_Tenant_' + tenant)}}"
-      project_nodes: "{{di_output_json | json_query('tag_Project_' + project)}}"
-      domain_nodes: "{{di_output_json | json_query('tag_Domain_' + domain)}}"
-  when: inventory_type == 'dynamic' and cloud == "aws"
-
 # If we're running this command for to build a cluster in OpenStack, then use the
 # `openstack` command to gather the dynamic inventory information that we need to
 # build our application host groups
@@ -32,21 +15,17 @@
       tenant_nodes: "{{(di_output_json | json_query('[\"meta-Tenant_' + tenant + '\"]')).0}}"
       project_nodes: "{{(di_output_json | json_query('[\"meta-Project_' + project + '\"]')).0}}"
       domain_nodes: "{{(di_output_json | json_query('[\"meta-Domain_' + domain + '\"]')).0}}"
-  when: inventory_type == 'dynamic' and cloud == "osp"
+  # then loop through the host_group_list, building each host group (in turn)
+  - include: ../files/build_osp_host_groups.yml
+    with_items: "{{host_group_list}}"
+    loop_control:
+      loop_var: host_group_item
+  when: cloud == "osp"
 
-# if we're not working with a static inventory (i.e. if wer'e working with inventory from an AWS
-# or OpenStack cloud), then loop through the host_group_types list, building each host group
-# (in turn)
-- include: ../files/build_dynamic_host_groups.yml
+# If we're running this command for to build a cluster in OpenStack, then loop
+# through the host_group_list, building each host group (in turn)
+- include: ../files/build_aws_host_groups.yml
   with_items: "{{host_group_list}}"
   loop_control:
     loop_var: host_group_item
-  when: inventory_type == 'dynamic'
-
-# Otherwise, if we are working with a static inventory, then loop through the host_group_types list,
-# building each host group (in turn)
-- include: ../files/build_static_host_groups.yml
-  with_items: "{{host_group_list}}"
-  loop_control:
-    loop_var: host_group_item
-  when: inventory_type == 'static'
+  when: cloud == 'aws'
