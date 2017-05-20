@@ -6,10 +6,11 @@
 # nodes that match but are **not** tagged with a Role tag)
 - set_fact:
     hg_item_role: "{{host_group_item.role | default('')}}"
+    hg_item_name: "{{host_group_item.as_name | default(host_group_item.name)}}"
 # set the facts for the application nodes appropriately (this includes
 # filtering for the application role if one was provided
 - set_fact:
-    application_nodes: "{{(di_output_json | json_query('[\"meta-Application_' + host_group_item.name + '\"]')).0}}"
+    application_nodes: "{{(di_output_json | json_query('[\"meta-Application_' + hg_item_name + '\"]')).0}}"
 - set_fact:
     app_nodes: "{{cloud_nodes | intersect(tenant_nodes) | intersect(project_nodes) | intersect(domain_nodes) | intersect(application_nodes)}}"
 # if a role was defined as part of this host group item, then run the
@@ -20,7 +21,7 @@
   # we're going to use for the matching node list we're returning
   - set_fact:
       role_nodes: "{{((di_output_json | json_query('[\"meta-Role_' + hg_item_role + '\"]')).0) | default([])}}"
-      node_list_name: "{{host_group_item.name + '_' + hg_item_role + '_nodes'}}"
+      node_list_name: "{{hg_item_name + '_' + hg_item_role + '_nodes'}}"
   # and use an intersection with that list of role nodes to construct the list
   # of matching app_nodes
   - set_fact:
@@ -35,7 +36,7 @@
   # list we're returning
   - set_fact:
       role_groups_string: "{{di_output_json | json_query('keys(@)') | select('match', 'meta-Role_*') | list | join('\", \"') }}"
-      node_list_name: "{{host_group_item.name + '_nodes'}}"
+      node_list_name: "{{hg_item_name + '_nodes'}}"
   # then, construct a flattened list of the nodes from the groups in the
   # `role_groups_string` we just constructed (above) and remove any nodes from
   # that list from our app_nodes list; this is done by taking the difference
@@ -51,7 +52,7 @@
 # containing that list and create the appropriately named host groups
 - set_fact:
     "{{node_list_name}}": "{{app_nodes}}"
-    app_group_name: "{{(hg_item_role == '') | ternary(host_group_item.name,(host_group_item.name + '_' + hg_item_role))}}"
+    app_group_name: "{{(hg_item_role == '') | ternary(hg_item_name,(hg_item_name + '_' + hg_item_role))}}"
 - name: Create {{app_group_name}} host group from OpenStack meta-data
   add_host:
     name: "{{item}}"

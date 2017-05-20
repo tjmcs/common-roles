@@ -6,6 +6,7 @@
 # are **not** tagged with a Role tag)
 - set_fact:
     hg_item_role: "{{host_group_item.role | default('')}}"
+    hg_item_name: "{{host_group_item.as_name | default(host_group_item.name)}}"
     match_filter:
       instance-state-name: running
       "tag:Application": "{{application}}"
@@ -13,8 +14,8 @@
       "tag:Project": "{{project}}"
       "tag:Tenant": "{{tenant}}"
 - set_fact:
-    node_list_name: "{{(hg_item_role == '') | ternary((host_group_item.name + '_nodes'), (host_group_item.name + '_' + hg_item_role + '_nodes'))}}"
-    app_group_name: "{{(hg_item_role == '') | ternary(host_group_item.name,(host_group_item.name + '_' + hg_item_role))}}"
+    node_list_name: "{{(hg_item_role == '') | ternary((hg_item_name + '_nodes'), (hg_item_name + '_' + hg_item_role + '_nodes'))}}"
+    app_group_name: "{{(hg_item_role == '') | ternary(hg_item_name,(hg_item_name + '_' + hg_item_role))}}"
 # if a role was defined, then add that field to our match_filter_dict value
 - block:
   - set_fact:
