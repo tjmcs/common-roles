@@ -7,6 +7,7 @@
 - set_fact:
     hg_item_role: "{{host_group_item.role | default('')}}"
     hg_item_name: "{{host_group_item.name}}"
+    hg_item_filter_roles: "{{host_group_item.filter_roles | default('true' | bool)}}"
 # set the facts for the application nodes appropriately (this includes
 # filtering for the application role if one was provided
 - set_fact:
@@ -30,20 +31,24 @@
 # if a role was not defined as part of this host group item, then run the
 # tasks this block
 - block:
-  # get a list of all of the groups in the dynamic inventory di_output_json
-  # string that was passed into this task file that are based on a Role tag
-  # of some sort and set the name we're going to use for the matching node
+  # if we're filtering on roles (see definition of the `hg_item_filter_roles`
+  # parameter, above), then get a list of all of the groups in the dynamic
+  # inventory string (`di_output_json`) that was passed into this task file
+  # that are based on a Role tag of some sort, otherwise just return an empty
+  # string; in addition, set the name we're going to use for the matching node
   # list we're returning
   - set_fact:
-      role_groups_string: "{{di_output_json | json_query('keys(@)') | select('match', 'meta-Role_*') | list | join('\", \"') }}"
+      role_groups_string: "{{(hg_item_filter_roles) | ternary((di_output_json | json_query('keys(@)') | select('match', 'meta-Role_*') | list | join('\", \"')),'')}}"
       node_list_name: "{{hg_item_name + '_nodes'}}"
-  # then, construct a flattened list of the nodes from the groups in the
-  # `role_groups_string` we just constructed (above) and remove any nodes from
-  # that list from our app_nodes list; this is done by taking the difference
-  # between our `app_nodes` list and that flattened list...the result is the
-  # list of all nodes match the other tags defined in this playbook run but
-  # that are not tagged with a Role tag of any sort (this matches the logic
-  # used when constructing these same host groups in an AWS cloud environment)
+  # then, if the `role_groups_string` is not an emptys string, construct a
+  # flattened list of the nodes from the groups in that string and remove any
+  # nodes from that list from our `app_nodes` list; this is done by taking the
+  # difference between our `app_nodes` list and that flattened list...the
+  # result is the list of all nodes match the other tags defined in this
+  # playbook run but that are not tagged with a Role tag of any sort (this
+  # matches the logic used when constructing these same host groups in an AWS
+  # cloud environment); if the `role_groups_string` is an empty string, then
+  # leave the `app_nodes` list (from above) untouched
   - set_fact:
       app_nodes: "{{app_nodes | difference(di_output_json | json_query('[\"' + role_groups_string + '\"][]'))}}"
     when: role_groups_string != ''

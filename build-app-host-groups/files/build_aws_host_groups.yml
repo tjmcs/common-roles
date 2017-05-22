@@ -7,6 +7,7 @@
 - set_fact:
     hg_item_role: "{{host_group_item.role | default('')}}"
     hg_item_name: "{{host_group_item.name}}"
+    hg_item_filter_roles: "{{host_group_item.filter_roles | default('true' | bool)}}"
 - set_fact:
     match_filter:
       instance-state-name: running
@@ -36,10 +37,12 @@
 # list of matching applications from the matching_instances output
 - set_fact:
     app_nodes: "{{matching_instances.instances | map(attribute='private_ip_address') | list}}"
-  when: hg_item_role != ''
-# otherwise, if a role was not included in the host group item passeed in,
-# filter the app_nodes list down to just the list of the matching nodes that
-# do not have a role tag (of any sort) assigned to them
+  when: hg_item_role != '' or not (hg_item_filter_roles)
+# otherwise, if a role was not included in the host group item passeed in and
+# we're filtering out any nodes that may have been tagged with a Role tag (see
+# the definition of the `hg_item_filter_roles` parameter, above), then filter
+# the app_nodes list down to just the list of the matching nodes that do not
+# have a role tag (of any sort) assigned to them
 - block:
   - set_fact:
       match_any_role_filter:
@@ -64,7 +67,7 @@
   # app_nodes list
   - set_fact:
       app_nodes: "{{matching_nodes | difference(any_role_nodes)}}"
-  when: hg_item_role == ''
+  when: hg_item_filter_roles and hg_item_role == ''
 # set a fact containing the matching "application nodes"
 - set_fact:
     "{{node_list_name}}": "{{app_nodes}}"
