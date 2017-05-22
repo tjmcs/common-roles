@@ -6,7 +6,7 @@
 # nodes that match but are **not** tagged with a Role tag)
 - set_fact:
     hg_item_role: "{{host_group_item.role | default('')}}"
-    hg_item_name: "{{host_group_item.as_name | default(host_group_item.name)}}"
+    hg_item_name: "{{host_group_item.name}}"
 # set the facts for the application nodes appropriately (this includes
 # filtering for the application role if one was provided
 - set_fact:

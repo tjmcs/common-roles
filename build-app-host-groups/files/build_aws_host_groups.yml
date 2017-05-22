@@ -6,10 +6,11 @@
 # are **not** tagged with a Role tag)
 - set_fact:
     hg_item_role: "{{host_group_item.role | default('')}}"
-    hg_item_name: "{{host_group_item.as_name | default(host_group_item.name)}}"
+    hg_item_name: "{{host_group_item.name}}"
+- set_fact:
     match_filter:
       instance-state-name: running
-      "tag:Application": "{{application}}"
+      "tag:Application": "{{hg_item_name}}"
       "tag:Domain": "{{domain}}"
       "tag:Project": "{{project}}"
       "tag:Tenant": "{{tenant}}"
@@ -43,7 +44,7 @@
   - set_fact:
       match_any_role_filter:
         instance-state-name: running
-        "tag:Application": "{{application}}"
+        "tag:Application": "{{hg_item_name}}"
         "tag:Domain": "{{domain}}"
         "tag:Project": "{{project}}"
         "tag:Tenant": "{{tenant}}"
@@ -72,5 +73,5 @@
   add_host:
     hostname: "{{item}}"
     groupname: "{{app_group_name}},{{node_list_name}}"
-    ansible_ssh_private_key_file: "{{private_key_path}}/{{cloud}}-{{ec2_region}}-{{application}}-{{project}}-{{domain}}-private-key.pem"
+    ansible_ssh_private_key_file: "{{private_key_path}}/{{cloud}}-{{ec2_region}}-{{hg_item_name}}-{{project}}-{{domain}}-private-key.pem"
   with_items: "{{app_nodes | default([])}}"
