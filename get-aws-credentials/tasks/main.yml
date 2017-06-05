@@ -1,0 +1,10 @@
+# (c) 2016 DataNexus Inc.  All Rights Reserved
+---
+# get the appropriate AWS credentials from the input `credentials_file`
+# (based on the input `ec2_region`)
+- set_fact:
+    section_filt_str: "{{((ec2_region | default('')) != '') | ternary(' section=' + ec2_region, '')}}"
+- name: Set facts for AWS credentials from credentials file
+  set_fact:
+    aws_access_key_id: "{{lookup('ini', 'aws_access_key_id' + section_filt_str + ' file=' + credentials_file)}}"
+    aws_secret_access_key: "{{lookup('ini', 'aws_secret_access_key' + section_filt_str + ' file=' + credentials_file)}}"
