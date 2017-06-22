@@ -9,53 +9,65 @@
     default_baseurl_relpx: "\\g<1>{{yum_repository}}\\g<3>"
     default_mirrorlist_regex: "^(mirrorlist=http://mirrorlist.centos.org/.*)$"
     default_mirrorlist_replx: "#\\g<1>"
+    mirrorlist_changed: false
+# Backup the default repository files (if we haven't already) and then point them
+# at the new repositories
 - block:
-  # Backup the default repository files (if we haven't already) and then point them
-  # at the new repositories
-  - name: Backup default {{repo_name | default('CentOS-Base')}}.repo file
+  - name: Backup default {{repo_name}}.repo file
     copy:
       src: "/etc/yum.repos.d/{{repo_name}}.repo"
       dest: "/etc/yum.repos.d/.{{repo_name}}.repo.bak"
       remote_src: true
       mode: 0644
       force: no
-  - name: Point repositories in {{repo_name | default('CentOS-Base')}}.repo file to mirror
+  - name: Point repositories in {{repo_name}}.repo file to mirror
     replace:
-      dest: "/etc/yum.repos.d/{{repo_name | default('CentOS-Base')}}.repo"
+      dest: "/etc/yum.repos.d/{{repo_name}}.repo"
       regexp: "{{((regex_repl_vals | default([])).baseurl | default([])).regex | default(default_baseurl_regex)}}"
       replace: "{{((regex_repl_vals | default([])).baseurl | default([])).replx | default(default_baseurl_relpx)}}"
   - name: Comment out mirrorlist entries
     replace:
-      dest: "/etc/yum.repos.d/{{repo_name | default('CentOS-Base')}}.repo"
+      dest: "/etc/yum.repos.d/{{repo_name}}.repo"
       regexp: "{{((regex_repl_vals | default([])).mirrorlist | default([])).regex | default(default_mirrorlist_regex)}}"
       replace: "{{((regex_repl_vals | default([])).mirrorlist | default([])).replx | default(default_mirrorlist_replx)}}"
+  # since we modified the default repo file, we will need to reload the yum
+  # cache (so set the flag used to trigger this behavior, below)
+  - set_fact:
+      mirrorlist_changed: true
   become: true
   when: not(yum_repository is undefined or yum_repository is none or yum_repository | trim == '')
-# if a repo_name was not passed in, then we copy the original files back from the backup copies
-# we created earlier
+# if a `yum_repository` value was not passed in, then we copy the original
+# files back from the backup copies we created earlier
 - block:
-  - name: Check if backup of {{repo_name | default('CentOS-Base')}}.repo file exists
+  - name: Check if backup of {{repo_name}}.repo file exists
     stat: path="/etc/yum.repos.d/.{{repo_name}}.repo.bak"
     register: check_path
   # restore the default repository files
-  - name: If it exists, restore the default {{repo_name | default('CentOS-Base')}}.repo file from the backup
+  - name: If it exists, restore the default {{repo_name}}.repo file from the backup
     copy:
       src: "/etc/yum.repos.d/.{{repo_name}}.repo.bak"
       dest: "/etc/yum.repos.d/{{repo_name}}.repo"
       remote_src: true
       mode: 0644
     when: check_path.stat.exists
+  # if we restored the default file, then set a flag indicating that the
+  # mirrorlist has been changed (i.e. we need to reload the yum cache)
+  - set_fact:
+      mirrorlist_changed: true
+    when: check_path.stat.exists
   become: true
   when: yum_repository is undefined or yum_repository is none or yum_repository | trim == ''
-# Finally, ensure that we clean up the yum cache and reload the (potentially new)
-# list of yum repositories
-- name: "remove all repository entries from the current yum cache"
-  become: true
-  command: yum clean all
-  args:
-    warn: no
-- name: "list all configured yum repositories"
-  become: true
-  command: yum repolist all
-  args:
-    warn: no
+# Finally, if we changed the mirrors used, ensure that we clean up the yum
+# cache and reload the list of yum repositories
+- block:
+  - name: "remove all repository entries from the current yum cache"
+    become: true
+    command: yum clean all
+    args:
+      warn: no
+  - name: "list all configured yum repositories"
+    become: true
+    command: yum repolist all
+    args:
+      warn: no
+  when: mirrorlist_changed | default(false)
