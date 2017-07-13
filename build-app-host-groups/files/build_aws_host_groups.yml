@@ -76,5 +76,5 @@
   add_host:
     hostname: "{{item}}"
     groupname: "{{app_group_name}},{{node_list_name}}"
-    ansible_ssh_private_key_file: "{{private_key_path}}/{{cloud}}-{{ec2_region}}-{{hg_item_name}}-{{project}}-{{domain}}-private-key.pem"
+    ansible_ssh_private_key_file: "{{private_key_path}}/{{cloud}}-{{ec2_region}}-{{ project }}-{{hg_item_name}}-{{domain}}-private-key.pem"
   with_items: "{{app_nodes | default([])}}"
