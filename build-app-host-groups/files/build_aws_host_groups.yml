@@ -1,13 +1,13 @@
 # (c) 2017 DataNexus Inc.  All Rights Reserved
 ---
-# setup the application host groups based on the defined tags appropriately
-# (this includes filtering for the application role if one was provided; if a
-# role was not provided then only return a list of the nodes that match but
-# are **not** tagged with a Role tag)
+# setup the application host groups based on the defined tags appropriately;
+# this includes filtering for the application role and/or cluster ID if one
+# was provided; if either the role or the cluster ID is not provided, then
+# look for nodes where this tag has been set to the default value of 'none'
 - set_fact:
-    hg_item_role: "{{host_group_item.role | default('')}}"
+    hg_item_role: "{{host_group_item.role | default('none')}}"
+    hg_item_cluster: "{{host_group_item.cluster | default('none')}}"
     hg_item_name: "{{host_group_item.name}}"
-    hg_item_filter_roles: "{{host_group_item.filter_roles | default('true' | bool)}}"
 - set_fact:
     match_filter:
       instance-state-name: running
@@ -15,17 +15,11 @@
       "tag:Domain": "{{domain}}"
       "tag:Project": "{{project}}"
       "tag:Tenant": "{{tenant}}"
+      "tag:Role": "{{hg_item_role}}"
+      "tag:Cluster": "{{hg_item_cluster}}"
 - set_fact:
-    node_list_name: "{{(hg_item_role == '') | ternary((hg_item_name + '_nodes'), (hg_item_name + '_' + hg_item_role + '_nodes'))}}"
-    app_group_name: "{{(hg_item_role == '') | ternary(hg_item_name,(hg_item_name + '_' + hg_item_role))}}"
-# if a role was defined, then add that field to our match_filter_dict value
-- block:
-  - set_fact:
-      match_role_dict:
-        "tag:Role": "{{hg_item_role}}"
-  - set_fact:
-      match_filter: "{{match_filter | combine(match_role_dict)}}"
-  when: hg_item_role != ''
+    node_list_name: "{{(hg_item_role == 'none') | ternary((hg_item_name + '_nodes'), (hg_item_name + '_' + hg_item_role + '_nodes'))}}"
+    app_group_name: "{{(hg_item_role == 'none') | ternary(hg_item_name,(hg_item_name + '_' + hg_item_role))}}"
 # then, gather the facts that are used to create our host group from the
 # `ec2_remote_facts` module
 - name: Gather facts for the hosts that match our filter
@@ -33,41 +27,9 @@
     region: "{{ec2_region}}"
     filters: "{{match_filter}}"
   register: matching_instances
-# if a role was included in the host group item passed in, then construct a
-# list of matching applications from the matching_instances output
+# construct a list of matching applications from the matching_instances output
 - set_fact:
     app_nodes: "{{matching_instances.instances | map(attribute='private_ip_address') | list}}"
-  when: hg_item_role != '' or not (hg_item_filter_roles)
-# otherwise, if a role was not included in the host group item passeed in and
-# we're filtering out any nodes that may have been tagged with a Role tag (see
-# the definition of the `hg_item_filter_roles` parameter, above), then filter
-# the app_nodes list down to just the list of the matching nodes that do not
-# have a role tag (of any sort) assigned to them
-- block:
-  - set_fact:
-      match_any_role_filter:
-        instance-state-name: running
-        "tag:Application": "{{hg_item_name}}"
-        "tag:Domain": "{{domain}}"
-        "tag:Project": "{{project}}"
-        "tag:Tenant": "{{tenant}}"
-        "tag:Role": "*"
-  - name: Gather facts for the hosts that match our filter and also have a Role tag
-    ec2_remote_facts:
-      region: "{{ec2_region}}"
-      filters: "{{match_any_role_filter}}"
-    register: has_role_instances
-  # construct two lists; one containing all of the nodes that matched our
-  # filter and another containing nodes that have a Role tag with any value
-  # in it
-  - set_fact:
-      matching_nodes: "{{matching_instances.instances | map(attribute='private_ip_address') | list}}"
-      any_role_nodes: "{{has_role_instances.instances | map(attribute='private_ip_address') | list}}"
-  # then take the difference to determine the matching nodes; store them in the
-  # app_nodes list
-  - set_fact:
-      app_nodes: "{{matching_nodes | difference(any_role_nodes)}}"
-  when: hg_item_filter_roles and hg_item_role == ''
 # set a fact containing the matching "application nodes"
 - set_fact:
     "{{node_list_name}}": "{{app_nodes}}"

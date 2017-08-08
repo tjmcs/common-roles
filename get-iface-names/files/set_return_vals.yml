@@ -5,8 +5,8 @@
 - set_fact:
     "{{iface_description.as_var}}": "{{iface_description.val}}"
   when: iface_description.type == 'name'
-# otherwise, we need to loop through the `ip_addr_list` and find the
-# value that is in the input CIDR block, then return the corresponding
-# interface name from the `iface_name_list`
-- include: ../files/get_iface_names.yml
+# otherwise, if the input `val` is a CIDR block, return name of the first
+# interface that has an IP address that value
+- set_fact:
+    "{{iface_description.as_var}}": "{{lcl_iface_names[lcl_iface_addresses.index((lcl_iface_addresses | ipaddr(iface_description.val)).0)]}}"
   when: iface_description.type == 'cidr'

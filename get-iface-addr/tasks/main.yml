@@ -1,7 +1,9 @@
 # (c) 2016 DataNexus Inc.  All Rights Reserved
 ---
-- name: Get IP address of {{iface_name}}
-  shell: "/usr/sbin/ip addr list {{iface_name}} | grep -w 'inet' | cut -d' ' -f6 | cut -d'/' -f1"
-  register: get_iface_addr_out
 - set_fact:
-    "{{as_fact | default('iface_addr')}}": "{{get_iface_addr_out.stdout}}"
+    lcl_addr: "{{((hostvars[inventory_hostname]['ansible_' + iface_name] | default({})).ipv4 | default({})).address | default('')}}"
+- fail: msg="Interface '{{iface_name}}' not found"
+  when: lcl_addr == ''
+- name: Get IP address of {{iface_name}}
+  set_fact:
+    "{{as_fact | default('iface_addr')}}": "{{lcl_addr}}"

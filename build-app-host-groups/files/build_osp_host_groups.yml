@@ -1,63 +1,36 @@
 # (c) 2017 DataNexus Inc.  All Rights Reserved
 ---
 # if this is an OpenStack cloud, then set the facts for the application nodes
-# appropriately (this includes filtering for the application role if one
-# was provided; if a role was not provided then only return a list of the
-# nodes that match but are **not** tagged with a Role tag)
+# appropriately; this includes filtering for the application role and/or the
+# cluster ID if either of those parameters were defined; if a role and/or
+# cluster ID was not provided then assume that the value 'none' was used,
+# since this is the default that is used for deployments where a role and/or
+# cluster ID are not necessary
 - set_fact:
-    hg_item_role: "{{host_group_item.role | default('')}}"
+    hg_item_role: "{{host_group_item.role | default('none')}}"
+    hg_item_cluster: "{{host_group_item.cluster | default('none')}}"
     hg_item_name: "{{host_group_item.name}}"
-    hg_item_filter_roles: "{{host_group_item.filter_roles | default('true' | bool)}}"
 # set the facts for the application nodes appropriately (this includes
 # filtering for the application role if one was provided
 - set_fact:
     application_nodes: "{{(di_output_json | json_query('[\"meta-Application_' + hg_item_name + '\"]')).0}}"
+    role_nodes: "{{(di_output_json | json_query('[\"meta-Application_' + role_nodes + '\"]')).0}}"
+    cluster_nodes: "{{(di_output_json | json_query('[\"meta-Application_' + hg_item_cluster + '\"]')).0}}"
 - set_fact:
-    app_nodes: "{{cloud_nodes | intersect(tenant_nodes) | intersect(project_nodes) | intersect(domain_nodes) | intersect(application_nodes)}}"
+    app_nodes: "{{cloud_nodes | intersect(tenant_nodes) | intersect(project_nodes) | intersect(domain_nodes) | intersect(application_nodes) | intersect(role_nodes) | intersect(cluster_nodes)}}"
 # if a role was defined as part of this host group item, then run the
 # tasks this block
 - block:
-  # use the input role tag to get the list of all of the nodes that were
-  # tagged with that role using the `json_query` filter and set the name
-  # we're going to use for the matching node list we're returning
+  # use the input role tag to to set the name we're going to use for the
+  # matching node list we're returning and the name of the host group we're
+  # going to be constructing
   - set_fact:
-      role_nodes: "{{((di_output_json | json_query('[\"meta-Role_' + hg_item_role + '\"]')).0) | default([])}}"
-      node_list_name: "{{hg_item_name + '_' + hg_item_role + '_nodes'}}"
-  # and use an intersection with that list of role nodes to construct the list
-  # of matching app_nodes
-  - set_fact:
-      app_nodes: "{{app_nodes | intersect(role_nodes)}}"
-  when: hg_item_role != ''
-# if a role was not defined as part of this host group item, then run the
-# tasks this block
-- block:
-  # if we're filtering on roles (see definition of the `hg_item_filter_roles`
-  # parameter, above), then get a list of all of the groups in the dynamic
-  # inventory string (`di_output_json`) that was passed into this task file
-  # that are based on a Role tag of some sort, otherwise just return an empty
-  # string; in addition, set the name we're going to use for the matching node
-  # list we're returning
-  - set_fact:
-      role_groups_string: "{{(hg_item_filter_roles) | ternary((di_output_json | json_query('keys(@)') | select('match', 'meta-Role_*') | list | join('\", \"')),'')}}"
-      node_list_name: "{{hg_item_name + '_nodes'}}"
-  # then, if the `role_groups_string` is not an emptys string, construct a
-  # flattened list of the nodes from the groups in that string and remove any
-  # nodes from that list from our `app_nodes` list; this is done by taking the
-  # difference between our `app_nodes` list and that flattened list...the
-  # result is the list of all nodes match the other tags defined in this
-  # playbook run but that are not tagged with a Role tag of any sort (this
-  # matches the logic used when constructing these same host groups in an AWS
-  # cloud environment); if the `role_groups_string` is an empty string, then
-  # leave the `app_nodes` list (from above) untouched
-  - set_fact:
-      app_nodes: "{{app_nodes | difference(di_output_json | json_query('[\"' + role_groups_string + '\"][]'))}}"
-    when: role_groups_string != ''
-  when: hg_item_role == ''
+      node_list_name: "{{(hg_item_role == 'none') | ternary((hg_item_name + '_nodes'), (hg_item_name + '_' + hg_item_role + '_nodes'))}}"
+      app_group_name: "{{(hg_item_role == 'none') | ternary(hg_item_name,(hg_item_name + '_' + hg_item_role))}}"
 # now that we have our list of matching "application nodes", set a fact
 # containing that list and create the appropriately named host groups
 - set_fact:
     "{{node_list_name}}": "{{app_nodes}}"
-    app_group_name: "{{(hg_item_role == '') | ternary(hg_item_name,(hg_item_name + '_' + hg_item_role))}}"
 - name: Create {{app_group_name}} host group from OpenStack meta-data
   add_host:
     name: "{{item}}"

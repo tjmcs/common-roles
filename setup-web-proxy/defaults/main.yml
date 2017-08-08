@@ -1,4 +1,0 @@
-# (c) 2016 DataNexus Inc.  All Rights Reserved
----
-proxy_certs_file: eg-certs.tar.gz
-reset_proxy_settings: false

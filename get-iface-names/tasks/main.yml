@@ -1,21 +1,16 @@
 # (c) 2016 DataNexus Inc.  All Rights Reserved
 ---
-# first, get a list of the IP addresses and the corresponding
-# list of network names for this host
-- name: Get list of IP addresses
-  shell: "/usr/sbin/ip addr list | grep -w 'inet' | awk '{ print $2 }'"
-  register: get_iface_addr_list_out
+# first, get a list of the IP addresses and the corresponding list of network
+# names for each host
 - set_fact:
-    ip_addr_list: "{{get_iface_addr_list_out.stdout.split('\n')}}"
-- name: Get list of interface names
-  shell: "/usr/sbin/ip addr list | grep -w 'inet' | awk '{ print $NF }'"
-  register: get_iface_name_list_out
+    lcl_host_facts: "{{hostvars[inventory_hostname]}}"
+    lcl_iface_info_keys: "{{hostvars[inventory_hostname].ansible_interfaces | map('regex_replace', '^(.*)$', 'ansible_\\1' ) | list}}"
 - set_fact:
-    iface_name_list: "{{get_iface_name_list_out.stdout.split('\n')}}"
-# then for each of the interface description values that were
-# passed in, determine what should be returned based on the 'type'
-# in that description (currently either 'cidr' or 'name' are
-# supported by this role)
+    lcl_iface_names: "{{lcl_host_facts.ansible_interfaces}}"
+    lcl_iface_addresses: "{{lcl_iface_info_keys | map('extract', lcl_host_facts, ['ipv4', 'address']) | list}}"
+# then, for each of the interface description values that were passed in,
+# determine what should be returned based on the 'type' in that description
+# (currently either 'cidr' or 'name' are supported by this role)
 - include: ../files/set_return_vals.yml
   with_items: "{{iface_descriptions}}"
   loop_control:
